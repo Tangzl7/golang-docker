@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"golang-docker/container"
+	"golang-docker/cgroups/subsystems"
 	"github.com/urfave/cli"
 	log "github.com/Sirupsen/logrus"
 )
@@ -10,10 +11,22 @@ import (
 var runCommand = &cli.Command {
 	Name: "run",
 	Usage: "Create a container with namespace and cgroup golang-docker run -ti [command]",
-	Flags: []cli.Flag{
-		&cli.BoolFlag{
+	Flags: []cli.Flag {
+		&cli.BoolFlag {
 			Name: "ti",
 			Usage: "enable tty",
+		},
+		&cli.StringFlag {
+			Name: "m",
+			Usage: "memory limit",
+		},
+		&cli.StringFlag {
+			Name: "cpushare",
+			Usage: "cpushare limit",
+		},
+		&cli.StringFlag {
+			Name: "cpuset",
+			Usage: "cpuset limit",
 		},
 	},
 	// run action
@@ -21,9 +34,15 @@ var runCommand = &cli.Command {
 		if context.NArg() < 1 {
 			return fmt.Errorf("Missing container command")
 		}
-		cmd := context.Args().Get(0)
+		cmdArray := context.Args().Slice()
 		tty := context.Bool("ti")
-		Run(tty, cmd)
+		resConf := &subsystems.ResourceConfig {
+			MemoryLimit: context.String("m"),
+			CpuSet: context.String("cpuset"),
+			CpuShare: context.String("cpushare"),
+		}
+
+		Run(tty, cmdArray, resConf)
 		return nil
 	},
 }
@@ -34,9 +53,8 @@ var initCommand = &cli.Command {
 	// init action
 	Action: func(context *cli.Context) error {
 		log.Infof("init come on")
-		cmd := context.Args().Get(0)
-		log.Infof("command %s", cmd)
-		err := container.RunContainerInitProcess(cmd, nil)
+		cmdArray := context.Args().Slice()
+		err := container.RunContainerInitProcess(cmdArray)
 		return err
 	},
 }

@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-const usage = `a docker implemented by golang`
+const usage = "a docker implemented by golang"
 
 func main() {
 	app := cli.NewApp()
