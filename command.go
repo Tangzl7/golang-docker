@@ -53,8 +53,7 @@ var initCommand = &cli.Command {
 	// init action
 	Action: func(context *cli.Context) error {
 		log.Infof("init come on")
-		cmdArray := context.Args().Slice()
-		err := container.RunContainerInitProcess(cmdArray)
+		err := container.RunContainerInitProcess()
 		return err
 	},
 }
