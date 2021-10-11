@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"syscall"
 	"os/exec"
+	// "path/filepath"
 	log "github.com/Sirupsen/logrus"
 )
 
@@ -27,6 +28,7 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
+	cmd.Dir ="/root/busybox"
 	// add a file descriptor for process
 	cmd.ExtraFiles = []*os.File{readPipe}
 	return cmd, writePipe
@@ -38,8 +40,7 @@ func RunContainerInitProcess() error {
 		return fmt.Errorf("get user command error")
 	}
 
-	// defaultMountFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
-	// syscall.Mount("proc", "/proc", "proc", uintptr(defaultMountFlags), "")
+	setUpMount()
 	path, err := exec.LookPath(cmdArray[0])
 	if err != nil {
 		log.Errorf("Exec loop path error %v", err)
@@ -70,4 +71,40 @@ func readUserCommand() []string {
 	}
 	msgStr := string(msg)
 	return strings.Split(msgStr, " ")
+}
+
+func pivotRoot(root string) error {
+	// pivot_root to new root rootfs, move old_root to rootfs/.pivot_root
+	if err := syscall.Chroot(root); err != nil {
+		return fmt.Errorf("pivot_root %v", err)
+	}
+	// make current path be root path
+	if err := syscall.Chdir("/"); err != nil {
+		return fmt.Errorf("chdir / %v", err)
+	}
+	if err := os.RemoveAll("proc"); err != nil {
+		return fmt.Errorf("failed to remove rootfs/proc: %v", err)
+	}
+	if err := os.Mkdir("proc", 0755); err != nil {
+		return fmt.Errorf("failed to mkdir rootfs/proc: %v", err)
+	}
+	// remove pivot_root
+	return nil
+}
+
+func setUpMount() {
+	pwd, err := os.Getwd()
+	if err != nil {
+		log.Errorf("Get current location error %v", err)
+		return
+	}
+	log.Infof("Current location is %s", pwd)
+
+	syscall.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, "")
+	pivotRoot(pwd)
+
+	// mount proc
+	defaultMountFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
+	syscall.Mount("proc", "/proc", "proc", uintptr(defaultMountFlags), "")
+	syscall.Mount("tmpfs", "/dev", "tmpfs", syscall.MS_NOSUID | syscall.MS_STRICTATIME, "mode=775")
 }
